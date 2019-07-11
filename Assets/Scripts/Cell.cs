@@ -5,12 +5,14 @@ public class Cell
     public int X;
     public int Y;
     public int Z;
-    public float Top => Z + Creeper;
 
-    public float Creeper;
+    public float People;
     public bool Changed;
 
-    public Shrine Shrine;
+    public float BirthRate;
+    public float MortalityRate;
+
+    public City City;
 
     private Player _owner;
 
@@ -32,17 +34,19 @@ public class Cell
         }
     }
     
-    public Color Color => GetColor();
-
     public void Init()
     {
         Changed = true;
     }
 
-    private Color GetColor()
+    public Color GetColor(int depth)
     {
-        var depth = Mathf.Round(Top / Field.DEPTH * 1.5f * 20f) * 0.05f;
+        if (City != null)
+        {
+            return Owner?.Color ?? Color.red;
+        }
+        var d = Mathf.Round((Z + People) / depth * 1.5f * 20f) * 0.05f;
         var color = Owner?.Color ?? Color.white;
-        return color * depth;
+        return color * d;
     }
 }

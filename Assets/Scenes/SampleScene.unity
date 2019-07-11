@@ -444,6 +444,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1157707318}
   - component: {fileID: 1157707319}
+  - component: {fileID: 1157707320}
   m_Layer: 0
   m_Name: StartUp
   m_TagString: Untagged
@@ -477,14 +478,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 81d1206ec8944c84aac197cc67f8d77c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  Config: {fileID: 1157707320}
+  Image: {fileID: 861947294}
+--- !u!114 &1157707320
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1157707317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 146c231b8d15471f84c0ddcc07993009, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
   Width: 192
   Height: 108
   Depth: 30
-  ShrinesPerPlayer: 1
-  TarCoef: 3
-  ShrineSpeed: 3
-  CellsPower: 0.01
-  Image: {fileID: 861947294}
+  Players: 3
+  CitiesPerPlayer: 5
+  FutureCities: 50
+  UpgradeCoef: 30
+  UpgradePower: 0.01
+  ScoutingCoef: 0.01
+  ScoutingPower: 0.15
+  CityBirthRateMultiplier: 5
+  BirthRate: 0.05
+  MortalityRate: 0.1
+  DistinctionCoef: 0.0001
 --- !u!1 &1305513434
 GameObject:
   m_ObjectHideFlags: 0

@@ -4,94 +4,129 @@ using Random = UnityEngine.Random;
 
 public class Field
 {
-    public static int WIDTH = 50;
-    public static int HEIGHT = 50;
-    public static int DEPTH = 20;
-    public const int PLAYERS = 3;
-    public static int SHRINES_PER_PLAYER = 3;
+    public Config Config;
     
-    public static float TAR_COEF = 0.25f;
-    public static float SHRINE_SPEED = 0.5f;
-    public static float CELLS_POWER = 0.01f;
-    
-    public Cell[,] Cells = new Cell[WIDTH,HEIGHT];
-    public HashSet<Cell> CellsWithCreeper = new HashSet<Cell>();
+    public Cell[,] Cells;
+    public HashSet<Cell> InhabitedCells = new HashSet<Cell>();
 
     public HashSet<Player> Players = new HashSet<Player>();
 
-    public void Init()
+    public void Init(Config config)
     {
-        for (int i = 0; i < WIDTH; i++)
+        Config = config;
+        
+        Cells = new Cell[Config.Width, Config.Height];
+        for (int i = 0; i < Config.Width; i++)
         {
-            for (int j = 0; j < HEIGHT; j++)
+            for (int j = 0; j < Config.Height; j++)
             {
                 var depth = 0;
                 
-                var x = Mathf.Round((float) i / 2) * 2 / WIDTH;
-                var y = Mathf.Round((float) j / 2) * 2 / HEIGHT;
-                depth = Mathf.RoundToInt(DEPTH * Mathf.PerlinNoise(x, y));
-                
+                var x = Mathf.Round((float) i / 2) * 2 / Config.Width;
+                var y = Mathf.Round((float) j / 2) * 2 / Config.Height;
+                depth = Mathf.RoundToInt(Config.Depth * Mathf.PerlinNoise(x, y));
+
                 var cell = new Cell
                 {
                     X = i,
                     Y = j,
-                    Z = depth
+                    Z = depth,
+                    BirthRate = Config.BirthRate,
+                    MortalityRate = Config.MortalityRate * (0.7f + 0.6f * depth / Config.Depth)
                 };
                 cell.Init();
                 Cells[i, j] = cell;
             }
         }
 
-        for (int i = 0; i < PLAYERS; i++)
+        for (int i = 0; i < Config.Players; i++)
         {
             var player = new Player();
             player.Color = i == 0 ? Color.yellow : i == 1 ? Color.green : Color.cyan;
             Players.Add(player);
 
-            for (int j = 0; j < SHRINES_PER_PLAYER; j++)
+            for (int j = 0; j < Config.CitiesPerPlayer; j++)
             {
-                var shrine = new Shrine();
-                shrine.Speed = SHRINE_SPEED;
-                player.Shrines.Add(shrine);
+                var city = new City();
+                city.BirthRateMultiplier = Config.CityBirthRateMultiplier;
+                player.Cities.Add(city);
                 
                 var cell = GetRandom();
+                cell.People = 1;
                 cell.Owner = player;
-                cell.Shrine = shrine;
-                shrine.Cell = cell;
+                cell.City = city;
+                city.Cell = cell;
                 
-                CellsWithCreeper.Add(cell);
+                InhabitedCells.Add(cell);
             }
+        }
+
+        for (int i = 0; i < Config.FutureCities; i++)
+        {
+            var city = new City();
+            city.BirthRateMultiplier = Config.CityBirthRateMultiplier;
+            
+            var cell = GetRandom();
+            cell.City = city;
+            city.Cell = cell;
         }
     }
 
     private Cell GetRandom()
     {
-        var x = Random.Range(0, WIDTH);
-        var y = Random.Range(0, HEIGHT);
+        var x = Random.Range(0, Config.Width);
+        var y = Random.Range(0, Config.Height);
         return Cells[x, y];
     }
 
     public void Step(float delta)
     {
         var changes = new List<CreeperChange>();
-        foreach (var cell in CellsWithCreeper)
+        foreach (var cell in InhabitedCells)
         {
-            if (cell.Creeper <= TAR_COEF) continue;
-            for (int i = 0; i < _directions.Length; i++)
+            if (cell.Owner == null) continue;
+            
+            var birthRate = cell.BirthRate;
+            if (cell.City != null)
             {
-                var direction = _directions[i];
-                var neighbour = GetCell(cell.X + direction.X, cell.Y + direction.Y);
+                birthRate *= cell.City.BirthRateMultiplier;
+            }
+            cell.People *= 1f + birthRate - cell.MortalityRate;
+
+            if (cell.People >= Config.UpgradeCoef)
+            {
+                var neighbour = GetNeighbours(cell, true).Random();
+                if (neighbour != null)
+                {
+                    var city = new City();
+                    city.BirthRateMultiplier = Config.CityBirthRateMultiplier;
+                    city.Cell = neighbour;
+                    neighbour.City = city;
+                    cell.People *= Config.UpgradePower;
+                }
+            }
+
+            if (cell.People < Config.DistinctionCoef)
+            {
+                cell.People = 0;
+                cell.Owner = null;
+                continue;
+            }
+
+            if (cell.People >= Config.ScoutingCoef)
+            {
+                var neighbour = GetNeighbours(cell, false).Random();
                 if (neighbour == null) continue;
-                if (cell.Top <= neighbour.Top) continue;
+                
                 changes.Add(new CreeperChange
                 {
                     From = cell,
                     To = neighbour
                 });
                 neighbour.Changed = true;
+    
+                cell.Changed = true;
             }
-
-            cell.Changed = true;
         }
         
         for (var i = 0; i < changes.Count; i++)
@@ -100,55 +135,55 @@ public class Field
             var from = change.From;
             var cell = change.To;
 
-            var amount = from.Creeper / 4f;
-            if (cell.Owner == from.Owner)
-            {
-                var diff = from.Top - cell.Top;
-                amount = Mathf.Min(diff / 2f, amount);
-            }
-            from.Creeper -= amount;
+            var amount = from.People * Config.ScoutingPower;
+            from.People -= amount;
 
             if (cell.Owner == null || cell.Owner == from.Owner)
             {
-                cell.Creeper += amount;
+                cell.People += amount;
             }
             else
             {
-                cell.Creeper -= amount;
+                cell.People -= amount;
             }
             
             if (cell.Owner == null)
             {
                 cell.Owner = from.Owner;
-                CellsWithCreeper.Add(cell);
+                InhabitedCells.Add(cell);
             }
             
-            if (cell.Creeper > 0) continue;
+            if (cell.People > 0) continue;
             if (cell.Owner == from.Owner) continue;
 
-            cell.Creeper *= -1f;
+            cell.People *= -1f;
             cell.Owner = from.Owner;
             
-            if (cell.Shrine != null)
+            if (cell.City != null)
             {
-                cell.Owner.Shrines.Remove(cell.Shrine);
-                from.Owner.Shrines.Add(cell.Shrine);
-            }
-        }
-        
-        foreach (Player player in Players)
-        {
-            foreach (var shrine in player.Shrines)
-            {
-                var creeperProduced = shrine.Speed * (1f + player.Cells * CELLS_POWER);
-                shrine.Cell.Creeper += creeperProduced;
+                cell.Owner.Cities.Remove(cell.City);
+                from.Owner.Cities.Add(cell.City);
             }
         }
     }
 
+    private List<Cell> GetNeighbours(Cell cell, bool checkCity)
+    {
+        var list = new List<Cell>();
+        for (int i = 0; i < _directions.Length; i++)
+        {
+            var direction = _directions[i];
+            var neighbour = GetCell(cell.X + direction.X, cell.Y + direction.Y);
+            if (neighbour == null) continue;
+            if (checkCity && neighbour.City != null && neighbour.Owner == cell.Owner) continue;
+            list.Add(neighbour);
+        }
+        return list;
+    }
+
     public Cell GetCell(int x, int y)
     {
-        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) return null;
+        if (x < 0 || x >= Config.Width || y < 0 || y >= Config.Height) return null;
         return Cells[x, y];
     }
 
